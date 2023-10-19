@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 
 var taskCount = 8000;
 
@@ -31,7 +33,17 @@ async Task ExecuteOneRequestAsync()
 {
     using var handler = new SocketsHttpHandler
     {
-        ConnectTimeout = TimeSpan.FromSeconds(2)
+        ConnectTimeout = TimeSpan.FromSeconds(2),
+        ConnectCallback = async (context, cancel) =>
+        {
+            var ipAddresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancel);
+
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+
+            await socket.ConnectAsync(ipAddresses.First(), context.DnsEndPoint.Port, cancel);
+
+            return new NetworkStream(socket, ownsSocket: true);
+        }
     };
     using var client = new HttpClient(handler)
     {
